@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recht-Quiz (Kahoot Style)</title>
+    <style>
+        :root {
+            --primary-bg: #f2f2f2;
+            --kahoot-red: #e21b3c;
+            --kahoot-blue: #1368ce;
+            --kahoot-yellow: #d89e00;
+            --kahoot-green: #26890c;
+            --sidebar-width: 250px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-bg);
+            display: flex;
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll, handle in main-container */
+        }
+
+        /* --- Scoreboard (Desktop: Rechts) --- */
+        #scoreboard-sidebar {
+            width: var(--sidebar-width);
+            background-color: #333;
+            color: white;
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            padding: 20px;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        #scoreboard-sidebar h2 {
+            border-bottom: 2px solid #fff;
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+
+        .player-stat {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .score-big {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--kahoot-yellow);
+        }
+
+        /* --- Main Content Area --- */
+        #main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin-right: var(--sidebar-width); /* Platz für Scoreboard */
+            overflow-y: auto; /* Scrollbar für Inhalt */
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* --- Screens --- */
+        .screen {
+            display: none;
+            width: 100%;
+            max-width: 900px;
+            text-align: center;
+            padding-bottom: 50px; /* Platz für Credit */
+        }
+
+        .active {
+            display: block;
+        }
+
+        /* --- Login Screen --- */
+        #login-screen input {
+            padding: 15px;
+            font-size: 1.2rem;
+            border-radius: 5px;
+            border: 2px solid #ccc;
+            width: 80%;
+            max-width: 400px;
+            margin-bottom: 20px;
+        }
+
+        /* --- Menu Screen --- */
+        .topic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .topic-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+            color: #333;
+            border-left: 5px solid var(--kahoot-blue);
+            text-align: left;
+        }
+
+        .topic-card:hover {
+            transform: translateY(-5px);
+            background-color: #e6f0ff;
+        }
+
+        /* --- Quiz Interface --- */
+        .question-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .answers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .answer-btn {
+            padding: 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            word-wrap: break-word; /* Damit langer Text umbricht */
+        }
+
+        .answer-btn:hover { opacity: 0.9; }
+        .answer-btn:active { transform: scale(0.98); }
+
+        .btn-red { background-color: var(--kahoot-red); }
+        .btn-blue { background-color: var(--kahoot-blue); }
+        .btn-yellow { background-color: var(--kahoot-yellow); }
+        .btn-green { background-color: var(--kahoot-green); }
+
+        .control-bar {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        button.control-btn {
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button.start-btn {
+            background-color: var(--kahoot-green);
+            font-size: 1.2rem;
+            padding: 15px 30px;
+        }
+
+        /* Feedback Animation */
+        .correct-anim { border: 5px solid green; transform: scale(1.02); }
+        .wrong-anim { opacity: 0.4; }
+
+        /* --- Footer Credit --- */
+        #credit-footer {
+            position: fixed;
+            bottom: 10px;
+            left: 15px;
+            font-size: 0.8rem;
+            color: #888;
+            pointer-events: none; /* Klicks gehen durch */
+            z-index: 200;
+            font-style: italic;
+        }
+
+        /* --- MOBILE RESPONSIVE DESIGN --- */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column; /* Stack vertically */
+            }
+
+            /* Scoreboard wird zur Top-Bar */
+            #scoreboard-sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding: 10px;
+                flex-direction: row;
+                justify-content: space-around;
+                align-items: center;
+                order: -1; /* Nach ganz oben schieben */
+                box-sizing: border-box;
+            }
+
+            #scoreboard-sidebar h2 { display: none; } /* Titel ausblenden um Platz zu sparen */
+            
+            .player-stat {
+                margin-bottom: 0;
+                font-size: 0.9rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .score-big {
+                font-size: 1.5rem;
+            }
+
+            /* Main Container anpassen */
+            #main-container {
+                margin-right: 0;
+                padding: 15px;
+                height: auto;
+                justify-content: flex-start; /* Oben anfangen */
+            }
+
+            /* Buttons untereinander auf Handy */
+            .answers-grid {
+                grid-template-columns: 1fr; /* Nur 1 Spalte */
+            }
+
+            .question-box {
+                font-size: 1.1rem;
+                padding: 15px;
+            }
+
+            .answer-btn {
+                padding: 15px;
+                min-height: 60px;
+            }
+
+            /* Credit auf Handy etwas kleiner */
+            #credit-footer {
+                font-size: 0.7rem;
+                bottom: 5px;
+                left: 10px;
+                background-color: rgba(255,255,255,0.7); /* Lesbarkeit verbessern */
+                padding: 2px 5px;
+                border-radius: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="scoreboard-sidebar">
+        <h2 id="desktop-title">Scoreboard</h2>
+        
+        <div class="player-stat">
+            <div style="font-size: 0.8rem; opacity: 0.8;">Spieler</div>
+            <div id="display-username" style="font-weight:bold;">-</div>
+        </div>
+
+        <div class="player-stat">
+            <div style="font-size: 0.8rem; opacity: 0.8;">Punkte</div>
+            <div id="display-score" class="score-big">0</div>
+        </div>
+
+        <div class="player-stat" id="topic-stat">
+            <div style="font-size: 0.8rem; margin-top:10px; opacity: 0.8;">Thema</div>
+            <div id="display-topic" style="font-size: 0.9rem; font-style:italic;">Keines</div>
+        </div>
+    </div>
+
+    <div id="main-container">
+
+        <div id="login-screen" class="screen active">
+            <h1>Recht-Quiz</h1>
+            <p>Bitte gib deinen Benutzernamen ein:</p>
+            <input type="text" id="username-input" placeholder="Dein Name..." onkeyup="if(event.key === 'Enter') startGame()">
+            <br>
+            <button class="control-btn start-btn" onclick="startGame()">Starten</button>
+        </div>
+
+        <div id="menu-screen" class="screen">
+            <h2>Thema wählen</h2>
+            <p style="font-size: 0.9rem;">Du kannst jederzeit wechseln.</p>
+            <div class="topic-grid">
+                <div class="topic-card" onclick="startTopic(1)">1. Grundlagen des Rechts</div>
+                <div class="topic-card" onclick="startTopic(2)">2. Zivilrecht / Personenrecht</div>
+                <div class="topic-card" onclick="startTopic(3)">3. Sachenrecht</div>
+                <div class="topic-card" onclick="startTopic(4)">4. Schuldrecht / Vertragsrecht</div>
+                <div class="topic-card" onclick="startTopic(5)">5. Konsumentenschutz</div>
+                <div class="topic-card" onclick="startTopic(6)">6. Zivilprozessrecht</div>
+                <div class="topic-card" onclick="startTopic(7)">7. Insolvenzrecht</div>
+            </div>
+        </div>
+
+        <div id="quiz-screen" class="screen">
+            <div class="control-bar">
+                <button class="control-btn" style="font-size: 0.8rem; padding: 8px 15px;" onclick="goToMenu()">🏠 Menü</button>
+                <span id="question-counter" style="font-weight: bold; color: #555;">Frage x / y</span>
+            </div>
+            
+            <div class="question-box" id="question-text">
+                Lade Frage...
+            </div>
+
+            <div class="answers-grid">
+                <button class="answer-btn btn-red" id="btn-0" onclick="checkAnswer(0)">Antwort A</button>
+                <button class="answer-btn btn-blue" id="btn-1" onclick="checkAnswer(1)">Antwort B</button>
+                <button class="answer-btn btn-yellow" id="btn-2" onclick="checkAnswer(2)">Antwort C</button>
+                <button class="answer-btn btn-green" id="btn-3" onclick="checkAnswer(3)">Antwort D</button>
+            </div>
+        </div>
+
+        <div id="end-screen" class="screen">
+            <h1>Thema abgeschlossen!</h1>
+            <p>Gut gemacht.</p>
+            <button class="control-btn start-btn" onclick="goToMenu()">Zurück zur Übersicht</button>
+        </div>
+
+    </div>
+
+    <div id="credit-footer">Made by Dominik Hübler</div>
+
+    <script>
+        // --- DATA: QUESTIONS (Based on sources 1-129) ---
+        const rawData = [
+            // --- THEMA 1: Grundlagen des Rechts ---
+            { t: 1, q: "Was sind leitende Verfassungsprinzipien?", a: ["Die wichtigsten Prinzipien und Eckpfeiler der Rechtsordnung", "Einfache Landesgesetze", "Verordnungen der Gemeinde", "Vorschläge der EU"] },
+            { t: 1, q: "Welches ist ein Beispiel für ein leitendes Verfassungsprinzip in Österreich?", a: ["Österreich ist eine Demokratie", "Österreich ist eine Monarchie", "Der Bundeskanzler bestimmt Gesetze allein", "Steuern sind freiwillig"] },
+            { t: 1, q: "Woraus besteht das primäre Gemeinschaftsrecht der EU?", a: ["Aus den Gründungsverträgen der europäischen Gemeinschaften", "Aus Verordnungen der Organe", "Aus österreichischen Landesgesetzen", "Aus Richtlinien"] },
+            { t: 1, q: "Was gehört zum sekundären Gemeinschaftsrecht der EU?", a: ["Verordnungen, Richtlinien und Entscheidungen", "Gründungsverträge", "Das österreichische Bundesverfassungsgesetz", "Der Bürgermeister"] },
+            { t: 1, q: "Was regeln Bundes- und Landesverfassungsgesetze im Bund?", a: ["Wer Gesetze erlassen darf und wie die Kontrolle ist", "Nur das Strafrecht", "Die Höhe der Steuern", "Den Preis von Waren"] },
+            { t: 1, q: "Was können Bundesländer in ihrer Landesverfassung festlegen?", a: ["Ihre eigenen Spielregeln", "Bundesgesetze", "EU-Richtlinien", "Das Strafrecht"] },
+            { t: 1, q: "Wozu dienen Verordnungen?", a: ["Um Gesetze zu präzisieren oder an die Praxis anzupassen", "Um die Verfassung zu ändern", "Um EU-Verträge zu kündigen", "Um neue Grundrechte zu schaffen"] },
+            { t: 1, q: "Was ist ein Beispiel für eine Einzelfallentscheidung?", a: ["Ein Bauansuchen an den Bürgermeister", "Ein neues Bundesgesetz", "Eine EU-Richtlinie", "Die Verfassung"] },
+            { t: 1, q: "Was ist der erste Schritt bei der Anwendung von Recht?", a: ["Feststellung des Sachverhalts und Beweisaufnahme", "Verkündung des Urteils", "Suche der Norm", "Prüfung der Rechtsfolge"] },
+            { t: 1, q: "Worum geht es im Öffentlichen Recht?", a: ["Personen stehen Behörden gegenüber und sind untergeordnet", "Gleichberechtigung zwischen Bürgern", "Verträge zwischen Firmen", "Eherecht"] },
+            { t: 1, q: "Für welches Beispiel ist die BH (Bezirkshauptmannschaft) zuständig (Öffentliches Recht)?", a: ["Firmengründung", "Ehescheidung", "Autokauf", "Testament"] },
+            { t: 1, q: "Was regelt das Bürgerliche Recht?", a: ["Regeln für jeden von uns (z.B. Vertragsrecht, Eherecht)", "Strafen für Verbrechen", "Steuern", "Verfassungsprinzipien"] },
+            { t: 1, q: "Was sind Sonderprivatrechte?", a: ["Rechte für bestimmte Personengruppen (z.B. Unternehmensrecht)", "Rechte für Politiker", "Rechte für die Polizei", "Rechte nur für Männer"] },
+            { t: 1, q: "Was regelt das Strafrecht?", a: ["Verhaltensweisen, die eingehalten werden müssen", "Den Kauf eines Autos", "Die Gründung einer GmbH", "Das Erbrecht"] },
+
+            // --- THEMA 2: Zivilrecht / Personenrecht ---
+            { t: 2, q: "Wer gilt als 'Natürliche Person'?", a: ["Jeder Mensch (Rechtssubjekt, Träger von Rechten/Pflichten)", "Nur Erwachsene ab 18", "Nur Firmen", "Nur österreichische Staatsbürger"] },
+            { t: 2, q: "Was ist eine 'Juristische Person'?", a: ["Gesellschaften wie z.B. eine GmbH", "Ein Richter", "Ein Anwalt", "Ein Notar"] },
+            { t: 2, q: "Wann beginnt die Rechtsfähigkeit bei natürlichen Personen?", a: ["Ab der Geburt bis zum Tod", "Ab 18 Jahren", "Ab 7 Jahren", "Ab 14 Jahren"] },
+            { t: 2, q: "Ist die Rechtsfähigkeit vom geistigen Zustand abhängig?", a: ["Nein, sie ist unabhängig vom geistigen Zustand", "Ja, nur Gesunde sind rechtsfähig", "Ja, man verliert sie bei Demenz", "Nur wenn man geschäftsfähig ist"] },
+            { t: 2, q: "Wie handelt eine juristische Person?", a: ["Durch ihre Organe", "Sie kann nicht handeln", "Durch den Bundespräsidenten", "Automatisch"] },
+            { t: 2, q: "Wie ist die Geschäftsfähigkeit von Kindern unter 7 Jahren geregelt?", a: ["Gänzlich geschäftsunfähig", "Beschränkt geschäftsfähig", "Voll geschäftsfähig", "Erweitert beschränkt geschäftsfähig"] },
+            { t: 2, q: "Welche Geschäfte dürfen Kinder unter 7 Jahren tätigen?", a: ["Taschengeldgeschäfte und Geschenke annehmen", "Handyverträge abschließen", "Teure Elektronik kaufen", "Arbeitsverträge unterschreiben"] },
+            { t: 2, q: "Welche Altersgruppe sind 'Unmündige Minderjährige'?", a: ["7 bis unter 14 Jahre", "Unter 7 Jahre", "14 bis unter 18 Jahre", "Ab 18 Jahren"] },
+            { t: 2, q: "Was dürfen unmündige Minderjährige (7-14)?", a: ["Altersübliche geringfügige Geschäfte und solche zu ihrem Vorteil", "Mopeds kaufen", "Kredite aufnehmen", "Wohnungen mieten"] },
+            { t: 2, q: "Welche Altersgruppe sind 'Mündige Minderjährige'?", a: ["14 bis unter 18 Jahre", "7 bis 14 Jahre", "Ab 18 Jahren", "Ab 21 Jahren"] },
+            { t: 2, q: "Was dürfen mündige Minderjährige (14-18) mit ihrem Einkommen tun?", a: ["Geschäfte in Höhe des Taschengeldes/Verdienstes, solange Lebensunterhalt nicht gefährdet ist", "Alles kaufen, egal wie teuer", "Kredite ohne Limit aufnehmen", "Firmen gründen"] },
+            { t: 2, q: "Ab wann ist man voll geschäftsfähig?", a: ["Ab 18 Jahren", "Ab 14 Jahren", "Ab 21 Jahren", "Ab 16 Jahren"] },
+            { t: 2, q: "Voraussetzung für die volle Geschäftsfähigkeit ab 18 ist...?", a: ["Geistige Handlungsfähigkeit", "Ein Job", "Ein Wohnsitz", "Die österreichische Staatsbürgerschaft"] },
+            { t: 2, q: "Wer haftet für das Handeln der Organe einer juristischen Person?", a: ["Die juristische Person selbst", "Niemand", "Der Staat", "Die Mitarbeiter"] },
+
+            // --- THEMA 3: Sachenrecht ---
+            { t: 3, q: "Was ist ein 'Inhaber'?", a: ["Jemand, der eine Sache hat, sie aber nicht behalten will (kein Besitzwille)", "Der Eigentümer", "Jemand, der die Sache als seine eigene behalten will", "Der Dieb"] },
+            { t: 3, q: "Was zeichnet einen 'Besitzer' aus?", a: ["Er hat die Sache und den Willen, sie zu behalten (Besitzwille)", "Er hat nur das Eigentumsrecht, aber nicht die Sache", "Er will die Sache sofort zurückgeben", "Er steht im C-Blatt des Grundbuchs"] },
+            { t: 3, q: "Was ist ein 'Eigentümer'?", a: ["Person mit dem absoluten Recht an einer Sache (kann beliebig damit verfahren)", "Nur der Inhaber", "Jemand, der die Sache gemietet hat", "Der Verkäufer"] },
+            { t: 3, q: "Wie lange hat ein Besitzer Zeit für eine Besitzstörungsklage?", a: ["30 Tage", "1 Jahr", "3 Jahre", "6 Monate"] },
+            { t: 3, q: "Welcher Grundsatz gilt beim Eigentumserwerb?", a: ["Niemand kann mehr Rechte übertragen, als er selbst hat", "Wer zuerst kommt, mahlt zuerst", "Eigentum entsteht durch bloßen Willen", "Besitz ist gleich Eigentum"] },
+            { t: 3, q: "Was sind die zwei Voraussetzungen für den Eigentumserwerb?", a: ["Titel und Erwerbsart", "Geld und Vertrag", "Notar und Unterschrift", "Besitz und Wille"] },
+            { t: 3, q: "Was ist ein Beispiel für einen 'Titel' beim Eigentumserwerb?", a: ["Kaufvertrag, Schenkung oder Gerichtsurteil", "Übergabe", "Grundbucheintragung", "Besitzwille"] },
+            { t: 3, q: "Was ist ein Beispiel für die 'Erwerbsart'?", a: ["Übergabe oder Grundbucheinschreibung", "Kaufvertrag", "Rechnung", "Handschlag"] },
+            { t: 3, q: "Wann wird man Eigentümer einer Sache?", a: ["Wenn Titel UND Erwerbsart erfüllt sind", "Sofort nach Zahlung", "Sofort nach Unterschrift", "Wenn man es sich wünscht"] },
+            { t: 3, q: "Was steht im A-Blatt des Grundbuchs?", a: ["Gutsbestandsblatt (Grundstücksnummer, Benützungsart)", "Eigentümer", "Belastungen", "Hypotheken"] },
+            { t: 3, q: "Was steht im B-Blatt des Grundbuchs?", a: ["Eigentumsblatt (Eigentümer, Anteile)", "Grundstücksgröße", "Pfandrechte", "Dienstbarkeiten"] },
+            { t: 3, q: "Was steht im C-Blatt des Grundbuchs?", a: ["Lastenblatt (Hypotheken, Dienstbarkeiten)", "Eigentümername", "Grundstücksnummer", "Fläche"] },
+            { t: 3, q: "Wer führt das Grundbuch?", a: ["Das Bezirksgericht", "Die Gemeinde", "Das Landesgericht", "Der Notar"] },
+            { t: 3, q: "Wer darf Einsicht ins Grundbuch nehmen?", a: ["Jeder", "Nur Anwälte", "Nur Eigentümer", "Nur die Bank"] },
+            { t: 3, q: "Was ist ein Pfandrecht?", a: ["Ein dingliches Recht zur Absicherung einer Forderung", "Das Recht, ein Haus zu bauen", "Das Recht, über ein fremdes Grundstück zu gehen", "Ein Mietvertrag"] },
+
+            // --- THEMA 4: Schuldrecht / Vertragsrecht ---
+            { t: 4, q: "Wer ist der Schuldner?", a: ["Hat die Pflicht zu einer Leistung", "Hat das Recht auf eine Leistung", "Führt das Grundbuch", "Ist immer die Bank"] },
+            { t: 4, q: "Was sind Voraussetzungen für einen gültigen Vertrag?", a: ["Geschäftsfähigkeit, Willenserklärung, Möglichkeit, Erlaubtheit", "Nur die Unterschrift", "Anwesenheit eines Notars", "Barzahlung"] },
+            { t: 4, q: "Was bedeutet 'Möglichkeit' als Vertragsbedingung?", a: ["Was absolut unmöglich ist, kann nicht Teil eines Vertrags sein", "Man muss alles möglich machen", "Der Vertrag muss schriftlich sein", "Jeder Vertrag ist möglich"] },
+            { t: 4, q: "Darf ein Vertrag gegen die guten Sitten verstoßen?", a: ["Nein, das wäre unerlaubt", "Ja, wenn beide zustimmen", "Ja, im Ausland", "Nur bei mündlichen Verträgen"] },
+            { t: 4, q: "Wie kann eine Willenserklärung erfolgen?", a: ["Ausdrücklich, Schlüssig oder (selten) Stillschweigend", "Nur Schriftlich", "Nur Mündlich", "Nur per E-Mail"] },
+            { t: 4, q: "Gilt Schweigen grundsätzlich als Zustimmung?", a: ["Nein, kein Vertrag kommt stillschweigend zustande", "Ja, immer", "Ja, im B2B Bereich", "Nur bei E-Mails"] },
+            { t: 4, q: "Was darf man mit unbestellten Waren tun?", a: ["Einfach entsorgen oder behalten (außer bei Irrtum)", "Man muss sie bezahlen", "Man muss sie zurückschicken", "Man muss sie aufbewahren"] },
+            { t: 4, q: "Was geschieht, wenn unbestellte Ware offensichtlich irrtümlich zugesendet wurde?", a: ["Man muss den Absender kontaktieren", "Man darf sie behalten", "Man darf sie wegwerfen", "Man muss sie bezahlen"] },
+            { t: 4, q: "Was ist der Erfüllungsort ohne Vereinbarung?", a: ["Dort, wo der Verkäufer dem Käufer die Ware übergibt", "Wohnort des Käufers", "Immer beim Gericht", "Im Ausland"] },
+            { t: 4, q: "Was ist ein 'Angeld'?", a: ["Eine Sicherstellung; bei Nichterfüllung darf es behalten oder doppelt gefordert werden", "Eine Anzahlung, die man immer zurückbekommt", "Die Mehrwertsteuer", "Eine Gebühr für den Vertrag"] },
+            { t: 4, q: "Was ist eine Konventionalstrafe (Pönale)?", a: ["Pauschalierter Schadenersatz bei Vertragsverletzung (z.B. Verzug)", "Eine Strafe der Polizei", "Die Gerichtskosten", "Zinsen bei der Bank"] },
+            { t: 4, q: "Was bedeutet Eigentumsvorbehalt?", a: ["Ware bleibt bis zur vollständigen Bezahlung Eigentum des Verkäufers", "Ware gehört sofort dem Käufer", "Käufer darf nicht weiterverkaufen", "Verkäufer behält die Ware bis zur Zahlung"] },
+            { t: 4, q: "Welche Art der Bürgschaft ist die strengste für den Bürgen?", a: ["Bürge und Zahler (zahlt sofort bei Fälligkeit)", "Ausfallsbürgschaft", "Einfache Bürgschaft", "Teilbürgschaft"] },
+            { t: 4, q: "Was ist Gewährleistung?", a: ["Gesetzliche Pflicht, für Mängel bei Übergabe einzustehen", "Freiwillige Zusage des Herstellers", "Versicherung gegen Diebstahl", "Garantie"] },
+            { t: 4, q: "Was ist ein Rechtsmangel?", a: ["Verkäufer verschafft nicht die versprochene rechtliche Position (z.B. verkauft Diebesgut)", "Die Ware ist kaputt", "Die Ware hat die falsche Farbe", "Die Lieferung ist zu spät"] },
+            { t: 4, q: "Welche Rechte hat der Käufer primär bei Gewährleistung?", a: ["Verbesserung (Reparatur) oder Austausch", "Preisminderung", "Wandlung", "Sofortige Kündigung"] },
+            { t: 4, q: "Wann kommen Preisminderung oder Wandlung zum Zug?", a: ["Wenn Verbesserung/Austausch unmöglich oder unverhältnismäßig sind", "Sofort nach Kauf", "Wenn der Käufer keine Lust hat", "Immer zuerst"] },
+            { t: 4, q: "Wie lange ist die Beweislastumkehr zugunsten des Käufers (B2C, Vgg)?", a: ["12 Monate", "6 Monate", "2 Jahre", "30 Tage"] },
+            { t: 4, q: "Wie lang ist die Gewährleistungsfrist für bewegliche Sachen?", a: ["2 Jahre", "3 Jahre", "6 Monate", "30 Jahre"] },
+            { t: 4, q: "Was ist eine Garantie?", a: ["Eine freiwillige Zusage von Hersteller oder Händler", "Gesetzlich vorgeschrieben", "Das gleiche wie Gewährleistung", "Eine Versicherung"] },
+            { t: 4, q: "Was bedeutet 'Verkürzung über die Hälfte' (Laesio enormis)?", a: ["Wert der Gegenleistung ist weniger als die Hälfte der eigenen Leistung wert", "Rabatt von 50%", "Halber Preis im Schlussverkauf", "Steuerersparnis"] },
+            { t: 4, q: "Was passiert bei nachträglicher Unmöglichkeit (z.B. durch Naturkatastrophe)?", a: ["Der Vertrag zerfällt, niemand haftet (außer bei Verschulden)", "Der Verkäufer muss trotzdem liefern", "Der Käufer muss zahlen", "Versicherung zahlt immer"] },
+            { t: 4, q: "Was ist ein Erfüllungsgehilfe?", a: ["Jemand, der eine vertragliche Pflicht für den Schuldner erfüllt", "Ein zufälliger Passant", "Ein Angestellter der Behörde", "Der Kunde"] },
+            { t: 4, q: "Haftet der Unternehmer für den Erfüllungsgehilfen?", a: ["Ja, wie für sein eigenes Verschulden", "Nein, nie", "Nur bei Vorsatz", "Nur wenn vertraglich vereinbart"] },
+            { t: 4, q: "Was ist leichte Fahrlässigkeit?", a: ["Ein Fehler, der gelegentlich auch einem sorgfältigen Menschen passiert", "Böse Absicht", "Auffallende Sorglosigkeit", "Ein Verbrechen"] },
+
+            // --- THEMA 5: Konsumentenschutz ---
+            { t: 5, q: "Wer ist Unternehmer im Sinne des KSchG?", a: ["Jemand, für den das Geschäft zum Betrieb seines Unternehmens gehört", "Jeder Erwachsene", "Jemand, der privat verkauft", "Ein Angestellter"] },
+            { t: 5, q: "Wer ist Verbraucher (Konsument)?", a: ["Jemand, der ein Geschäft privat abschließt", "Eine GmbH", "Ein Großhändler", "Ein Selbstständiger im Dienst"] },
+            { t: 5, q: "Sind Kostenvoranschläge für Konsumenten grundsätzlich kostenlos?", a: ["Ja, wenn nicht auf Zahlungspflicht hingewiesen wurde", "Nein, nie", "Nur bei Autos", "Nur bei Häusern"] },
+            { t: 5, q: "Darf ein Kostenvoranschlag überschritten werden?", a: ["Ja, aber nur unerheblich (ca. 10-15%) ohne neue Zustimmung", "Nein, niemals", "Ja, beliebig hoch", "Ja, bis zu 50%"] },
+            { t: 5, q: "Was sind 'Außergeschäftsraumverträge'?", a: ["Verträge, die außerhalb eines Geschäftsraums geschlossen werden (z.B. Haustür)", "Online-Shopping", "Kauf im Supermarkt", "Verträge im Büro"] },
+            { t: 5, q: "Wie lange ist die Rücktrittsfrist bei Außergeschäftsraumverträgen?", a: ["14 Tage", "7 Tage", "30 Tage", "3 Tage"] },
+            { t: 5, q: "Was ist eine Verbandsklage?", a: ["Klage gegen rechtswidrige Bestimmungen in AGB durch Verbände", "Klage eines einzelnen Kunden", "Klage der Polizei", "Klage gegen Mitarbeiter"] },
+            { t: 5, q: "Darf ein Unternehmer grob benachteiligende Bestimmungen in AGB nutzen?", a: ["Nein, diese sind unzulässig", "Ja, wenn sie klein gedruckt sind", "Ja, immer", "Nur bei Firmenkunden"] },
+
+            // --- THEMA 6: Zivilprozessrecht ---
+            { t: 6, q: "Bis zu welchem Streitwert sind Bezirksgerichte zuständig?", a: ["Bis 15.000 EUR", "Bis 5.000 EUR", "Bis 100.000 EUR", "Unbegrenzt"] },
+            { t: 6, q: "Wofür ist das Bezirksgericht eigenzuständig (unabhängig vom Wert)?", a: ["Ehescheidungen, Besitzstörung, Mietstreitigkeiten", "Mordprozesse", "Firmeninsolvenzen", "Aktienrecht"] },
+            { t: 6, q: "Ab welchem Streitwert ist das Landesgericht zuständig?", a: ["Über 15.000 EUR", "Über 5.000 EUR", "Über 75.000 EUR", "Über 1 Million EUR"] },
+            { t: 6, q: "Wann herrscht Anwaltspflicht vor dem Bezirksgericht?", a: ["Bei Streitwerten über 5.000 EUR", "Immer", "Nie", "Ab 15.000 EUR"] },
+            { t: 6, q: "Was passiert beim Mahnverfahren?", a: ["Gerichtlicher Zahlungsbefehl bei Geldforderungen bis 75.000 EUR", "Sofortige Pfändung", "Gefängnisstrafe", "Polizeieinsatz"] },
+            { t: 6, q: "Wie lange hat man Zeit für einen Einspruch gegen einen Zahlungsbefehl?", a: ["4 Wochen", "2 Wochen", "1 Woche", "3 Monate"] },
+            { t: 6, q: "Was passiert, wenn man keinen Einspruch gegen den Zahlungsbefehl erhebt?", a: ["Er wird rechtskräftig und vollstreckbar (Exekution)", "Das Verfahren endet", "Man bekommt eine Mahnung", "Nichts"] },
+            { t: 6, q: "Wer trägt die Kosten eines Zivilprozesses?", a: ["Der Prozessverlierer", "Der Staat", "Jeder zahlt seine eigenen Kosten", "Die Versicherung immer"] },
+            { t: 6, q: "Was ist die 2. Instanz, wenn das Verfahren am Bezirksgericht begann?", a: ["Landesgericht (LG)", "Oberlandesgericht (OLG)", "Oberster Gerichtshof (OGH)", "Verfassungsgerichtshof"] },
+            { t: 6, q: "Was ist die 3. Instanz?", a: ["Oberster Gerichtshof (OGH)", "Landesgericht", "Bezirksgericht", "EuGH"] },
+            { t: 6, q: "Was passiert bei einer Exekution?", a: ["Pfändung von Lohn oder Fahrnis (bewegliche Güter)", "Gefängnis", "Verhandlung", "Mahnung"] },
+
+            // --- THEMA 7: Insolvenzrecht ---
+            { t: 7, q: "Was bedeutet Insolvenz?", a: ["Zahlungsunfähigkeit", "Gewinn", "Fusionsabsicht", "Kreditaufnahme"] },
+            { t: 7, q: "Was ist das Ziel einer Schuldnerberatungsstelle?", a: ["Helfen, aus Schulden herauszukommen", "Kredite vergeben", "Exekutionen durchführen", "Waren verkaufen"] },
+            { t: 7, q: "Was ist eine Voraussetzung für den Privatkonkurs (Schuldenregulierungsverfahren)?", a: ["Zahlungsunfähigkeit und gescheiterter außergerichtlicher Ausgleichsversuch", "Vermögen über 100.000 Euro", "Besitz einer Firma", "Keine Schulden"] },
+            { t: 7, q: "Wie lange dauert der Tilgungsplan im Privatkonkurs?", a: ["3 Jahre", "7 Jahre", "10 Jahre", "1 Jahr"] },
+            { t: 7, q: "Wie lange dauert der Abschöpfungsplan?", a: ["5 Jahre", "3 Jahre", "7 Jahre", "Lebenslänglich"] },
+            { t: 7, q: "Was passiert nach erfolgreichem Privatkonkurs?", a: ["Restschuldbefreiung", "Gefängnis", "Neue Schulden", "Verlust der Staatsbürgerschaft"] },
+            { t: 7, q: "Wann ist eine Kapitalgesellschaft (z.B. GmbH) insolvent?", a: ["Bei Zahlungsunfähigkeit oder Überschuldung (mit negativer Fortbestehensprognose)", "Nur bei Zahlungsunfähigkeit", "Wenn sie keinen Gewinn macht", "Wenn der Chef krank ist"] },
+            { t: 7, q: "Was ist ein Sanierungsverfahren mit Eigenverwaltung?", a: ["Unternehmer führt Geschäft weiter, Mindestquote 30% in 2 Jahren", "Unternehmer wird enteignet", "Firma wird sofort geschlossen", "Mindestquote 20%"] },
+            { t: 7, q: "Was ist die Mindestquote beim Sanierungsverfahren OHNE Eigenverwaltung?", a: ["20 Prozent in 2 Jahren", "30 Prozent in 2 Jahren", "50 Prozent sofort", "10 Prozent in 5 Jahren"] },
+            { t: 7, q: "Wer beaufsichtigt das Unternehmen bei der Sanierung mit Eigenverwaltung?", a: ["Ein Sanierungsverwalter", "Niemand", "Die Bank", "Der Gläubiger"] },
+            
+            // --- WEITERE FRAGEN ZUR FÜLLUNG UND ABDECKUNG ---
+            { t: 3, q: "Was ist eine 'Reallast'?", a: ["Verpflichtung zu wiederkehrenden Leistungen (z.B. Ausgedinge)", "Einmalige Zahlung", "Verbot zu bauen", "Recht einen Weg zu nutzen"] },
+            { t: 4, q: "Was ist ein Tauschvertrag?", a: ["Sache gegen Sache", "Sache gegen Geld", "Nutzung gegen Entgelt", "Arbeit gegen Geld"] },
+            { t: 4, q: "Was ist ein Leihvertrag?", a: ["Unentgeltliche Überlassung zum Gebrauch", "Entgeltliche Überlassung", "Kauf einer Sache", "Tausch"] },
+            { t: 4, q: "Was regelt ein Dienstvertrag?", a: ["Leistung von Arbeit gegen Entgelt", "Herstellung eines Werkes", "Miete einer Wohnung", "Verkauf von Waren"] },
+            { t: 4, q: "Was regelt ein Mietvertrag?", a: ["Entgeltliche Gebrauchsüberlassung einer Sache", "Unentgeltliche Nutzung", "Verkauf einer Wohnung", "Tausch von Wohnungen"] },
+            { t: 4, q: "Was ist eine Stornogebühr (Reugeld)?", a: ["Gegenleistung für das Recht, vom Vertrag zurückzutreten", "Strafe für Diebstahl", "Gebühr für Beratung", "Steuer"] },
+            { t: 1, q: "Was ist die Rechtsfolge einer mangelhaften Erfüllung?", a: ["Gewährleistung", "Sofortige Haftstrafe", "Nichts", "Verjährung"] },
+            { t: 1, q: "Was ist ein Verzug?", a: ["Nichtleistung zur vereinbarten Zeit, am Ort oder auf Art und Weise", "Unmöglichkeit der Leistung", "Mangelhafte Ware", "Zu teure Ware"] },
+            { t: 7, q: "Was ist Bonität?", a: ["Fähigkeit eines Schuldners, Zahlungsverpflichtungen zu erfüllen", "Höhe der Schulden", "Name der Bank", "Anzahl der Mitarbeiter"] },
+            { t: 4, q: "Wie lange verjähren Gewährleistungsansprüche bei beweglichen Sachen?", a: ["Nach 2 Jahren", "Nach 30 Jahren", "Nach 3 Jahren", "Nach 6 Monaten"] },
+            { t: 4, q: "Was bedeutet 'Zug um Zug'?", a: ["Leistung und Gegenleistung erfolgen gleichzeitig", "Erst Ware, dann Geld später", "Erst Geld, dann Ware später", "Ratenzahlung"] },
+            { t: 4, q: "Formvorschriften: Sind alle Verträge formgebunden?", a: ["Nein, nur manche (die meisten sind formfrei)", "Ja, alle müssen schriftlich sein", "Ja, alle brauchen einen Notar", "Nein, es gibt keine Formvorschriften"] },
+            { t: 2, q: "Was sind 'Taschengeldgeschäfte'?", a: ["Erlaubte Geschäfte für Kinder, die mit Taschengeld bezahlt werden", "Geschäfte der Eltern", "Illegale Geschäfte", "Bankgeschäfte"] },
+            { t: 7, q: "Was passiert beim 'Stillen Ausgleich'?", a: ["Außergerichtliche Einigung, Zustimmung aller Gläubiger nötig", "Gerichtliches Verfahren", "Veröffentlichung in der Insolvenzdatei", "Sofortiger Konkurs"] },
+            { t: 4, q: "Wann haftet der Bürge bei einer Ausfallsbürgschaft?", a: ["Erst wenn Exekution beim Hauptschuldner erfolglos war", "Sofort bei Mahnung", "Gleich wie der Schuldner", "Gar nicht"] },
+            { t: 3, q: "Kann man Eigentum allein durch Willen erwerben?", a: ["Nein, Titel und Modus sind nötig", "Ja, wenn man es fest will", "Ja, bei kleinen Sachen", "Ja, bei Fundstücken"] },
+            { t: 6, q: "Was ist ein Wahlgerichtsstand?", a: ["Ein Gericht, das man wählen kann (z.B. vertraglich vereinbart)", "Ein Gericht, das gewählt wird", "Das Gericht am Wohnort des Beklagten", "Das oberste Gericht"] },
+            { t: 5, q: "Muss ein Unternehmer auf ungewöhnliche Vertragsbestimmungen hinweisen?", a: ["Ja, besonders darauf hinweisen", "Nein", "Nur schriftlich", "Nur bei Immobilien"] },
+            { t: 4, q: "Was ist eine Bedingung im Vertrag?", a: ["Recht wird von einem ungewissen Ereignis abhängig gemacht", "Ein fix vereinbartes Datum", "Eine Verpflichtung aus Testament", "Der Preis"] },
+            { t: 4, q: "Was ist eine Befristung?", a: ["Ereignis wird sicher eintreten, Recht beginnt/endet dann", "Ungewisses Ereignis", "Eine Auflage", "Ein Rücktritt"] },
+            { t: 4, q: "Wie erfolgt die Übergabe beim 'Versendungskauf' (B2C)?", a: ["Erfüllungsort ist dort, wo die Ware übergeben wird", "Beim Absenden", "Beim Zoll", "Im Geschäft"] },
+            { t: 7, q: "Was ist eine externe Ursache für Unternehmensinsolvenz?", a: ["Veränderungen im Umfeld, Wirtschaftskrise, Preisdumping", "Managementfehler", "Kapitalmangel", "Fehlende Kostenrechnung"] },
+            { t: 7, q: "Was ist eine interne Ursache für Unternehmensinsolvenz?", a: ["Managementfehler, Kapitalmangel", "Hochwasser", "Corona-Pandemie", "Streik der Zulieferer"] }
+        ];
+
+        // --- GLOBAL VARIABLES ---
+        let currentTopicQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let username = "";
+        let currentTopicId = 0;
+        let waitingForAnswer = false;
+
+        // --- FUNCTIONS ---
+
+        function startGame() {
+            const input = document.getElementById('username-input');
+            if (input.value.trim() === "") {
+                alert("Bitte gib einen Namen ein!");
+                return;
+            }
+            username = input.value;
+            document.getElementById('display-username').innerText = username;
+            
+            // Switch screens
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('menu-screen').classList.add('active');
+        }
+
+        function startTopic(topicId) {
+            currentTopicId = topicId;
+            currentTopicQuestions = rawData.filter(q => q.t === topicId);
+            currentTopicQuestions = shuffleArray(currentTopicQuestions);
+
+            if (currentTopicQuestions.length === 0) {
+                alert("Keine Fragen für dieses Thema gefunden.");
+                return;
+            }
+
+            const topicNames = ["", "Grundlagen", "Personenrecht", "Sachenrecht", "Vertragsrecht", "Konsumentenschutz", "Zivilprozess", "Insolvenzrecht"];
+            document.getElementById('display-topic').innerText = topicNames[topicId];
+
+            currentQuestionIndex = 0;
+            
+            document.getElementById('menu-screen').classList.remove('active');
+            document.getElementById('quiz-screen').classList.add('active');
+
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            waitingForAnswer = false;
+            const qData = currentTopicQuestions[currentQuestionIndex];
+            
+            document.getElementById('question-counter').innerText = `Frage ${currentQuestionIndex + 1} / ${currentTopicQuestions.length}`;
+            document.getElementById('question-text').innerText = qData.q;
+
+            let answersWithIndex = qData.a.map((ans, index) => ({ text: ans, originalIndex: index }));
+            answersWithIndex = shuffleArray(answersWithIndex);
+
+            for (let i = 0; i < 4; i++) {
+                const btn = document.getElementById(`btn-${i}`);
+                btn.innerText = answersWithIndex[i].text;
+                btn.dataset.isCorrect = (answersWithIndex[i].originalIndex === 0);
+                
+                btn.style.opacity = "1";
+                btn.classList.remove('correct-anim');
+                btn.classList.remove('wrong-anim');
+            }
+        }
+
+        function checkAnswer(btnIndex) {
+            if (waitingForAnswer) return;
+            waitingForAnswer = true;
+
+            const btn = document.getElementById(`btn-${btnIndex}`);
+            const isCorrect = (btn.dataset.isCorrect === "true");
+
+            if (isCorrect) {
+                score++;
+                document.getElementById('display-score').innerText = score;
+                btn.classList.add('correct-anim');
+                
+                setTimeout(() => {
+                    nextQuestion();
+                }, 1000);
+            } else {
+                btn.classList.add('wrong-anim');
+                for (let i = 0; i < 4; i++) {
+                    const b = document.getElementById(`btn-${i}`);
+                    if (b.dataset.isCorrect === "true") {
+                        b.classList.add('correct-anim');
+                    }
+                }
+                setTimeout(() => {
+                    nextQuestion();
+                }, 2000);
+            }
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentTopicQuestions.length) {
+                loadQuestion();
+            } else {
+                finishTopic();
+            }
+        }
+
+        function finishTopic() {
+            document.getElementById('quiz-screen').classList.remove('active');
+            document.getElementById('end-screen').classList.add('active');
+            document.getElementById('display-topic').innerText = "Abgeschlossen";
+        }
+
+        function goToMenu() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('menu-screen').classList.add('active');
+            document.getElementById('display-topic').innerText = "Menü";
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+    </script>
+</body>
+</html>

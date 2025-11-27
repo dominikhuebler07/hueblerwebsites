@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rechts-Quiz (Kahoot-like)</title>
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--accent:#2b6cb0;--muted:#666}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#111}
+    header{background:linear-gradient(90deg,#fff 0,#eef5ff);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e6eef9}
+    .brand{font-weight:700;color:var(--accent)}
+    main{display:flex;height:calc(100vh - 64px);gap:18px;padding:18px}
+    .left{flex:1;display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(30,50,90,0.06)}
+    .home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .topic-btn{padding:12px;border-radius:8px;border:1px solid #e6eef9;background:#fff;cursor:pointer}
+    .topic-btn:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(39,63,121,0.06)}
+    .right{width:260px}
+    .score{font-size:20px;font-weight:700;color:var(--accent)}
+    .mini{font-size:13px;color:var(--muted)}
+    .question{font-size:20px;margin-bottom:12px}
+    .options{display:grid;gap:10px}
+    .opt{padding:12px;border-radius:8px;border:1px solid #e6eef9;background:#fff;cursor:pointer;text-align:left}
+    .opt.correct{background:#e6ffef;border-color:#7be6a6}
+    .opt.wrong{background:#fff0f0;border-color:#ffb6b6}
+    .controls{display:flex;gap:8px;margin-top:12px}
+    .btn{padding:10px 12px;border-radius:8px;border:0;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff}
+    .btn.ghost{background:#fff;border:1px solid #e6eef9}
+    .username{display:flex;gap:8px;align-items:center}
+    footer{padding:8px 18px;font-size:13px;color:var(--muted);border-top:1px solid #eef5ff}
+    .small-note{font-size:12px;color:var(--muted);margin-top:8px}
+    .hidden{display:none}
+    .status-line{display:flex;gap:8px;align-items:center}
+    .userlist{font-size:13px;margin-top:8px}
+    .score-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #f0f5fb}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Rechts-Quiz — Lernen & Punkten</div>
+    <div class="username card" id="userCard">
+      <label for="usernameInput" class="mini">Benutzername (Pflicht):</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input id="usernameInput" placeholder="Dein Name" />
+        <button class="btn primary" id="saveUserBtn">Los</button>
+      </div>
+      <div class="small-note">Mehrere Spieler: Jeder wählt einen eigenen Benutzernamen beim Einstieg.</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="left">
+      <!-- Home / Topic selection -->
+      <div class="card" id="homeView">
+        <h3>Home — Thema wählen</h3>
+        <p class="mini">Wähle ein Thema, um zu starten. Punkte werden sofort gutgeschrieben und bleiben erhalten, wenn du das Thema wechselst.</p>
+        <div class="home-grid" id="topicsGrid">
+          <!-- Buttons werden per JS befüllt -->
+        </div>
+        <div class="small-note">Quelle der Fragen: deine hochgeladene Word-Datei. :contentReference[oaicite:1]{index=1}</div>
+      </div>
+
+      <!-- Quiz view -->
+      <div class="card hidden" id="quizView">
+        <div class="status-line">
+          <div><strong id="currentTopic">Thema</strong></div>
+          <div class="mini" id="progress">Frage x / y</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="question" id="questionText">Frage...</div>
+          <div class="options" id="optionsList"></div>
+
+          <div class="controls">
+            <button class="btn ghost" id="backBtn">Zurück zur Themenauswahl</button>
+            <button class="btn ghost" id="skipBtn">Nächste Frage</button>
+          </div>
+
+          <div class="small-note">Du kannst jederzeit das Thema wechseln — dein Punktestand bleibt erhalten.</div>
+        </div>
+      </div>
+
+      <!-- End / info -->
+      <div class="card" id="infoCard">
+        <h4>Spielregeln</h4>
+        <ul>
+          <li>Beim Einstieg Benutzernamen angeben (Pflicht).</li>
+          <li>Jede richtige Antwort bringt sofort <strong>1 Punkt</strong>.</li>
+          <li>Bei falscher Antwort keine Punkte und die richtige Antwort wird angezeigt.</li>
+          <li>Kategorien jederzeit abbrechen — Punkte bleiben.</li>
+        </ul>
+      </div>
+    </div>
+
+    <aside class="right">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mini">Eingeloggt als</div>
+            <div id="displayUser" class="score">—</div>
+          </div>
+          <div>
+            <div class="mini">Punkte</div>
+            <div id="displayScore" class="score">0</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="mini">Andere Spieler (lokal)</div>
+          <div id="playersList" class="userlist"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="mini">Schnellaktionen</div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="btn ghost" id="resetScoreBtn">Score zurücksetzen</button>
+          <button class="btn ghost" id="changeUserBtn">Benutzer wechseln</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="mini">Hinweis</div>
+        <div class="small-note">Alle Fragen stammen aus deiner Datei. Kein externes Material wurde verwendet. :contentReference[oaicite:2]{index=2}</div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    Die Fragen basieren ausschließlich auf dem von dir hochgeladenen Skript. :contentReference[oaicite:3]{index=3}
+  </footer>
+
+<script>
+/* --- DATEN: Kategorien mit Fragen (alle Inhalte stammen aus der hochgeladenen Word-Datei) --- */
+/* Es gibt 7 Kategorien (Überschriften wie in der Word-Datei). Jede Kategorie hat 15 Fragen => 105 Fragen insgesamt. */
+/* Jede Frage-Option wurde ausschließlich aus der Inhalte der Datei formuliert. */
+
+const categories = [
+  {
+    id: 'grundlagen',
+    title: '1 Grundlagen des Rechts',
+    questions: [
+      { q: 'Welches Leitprinzip wird in der Datei als Eckpfeiler der österreichischen Rechtsordnung genannt?', options: ['Österreich ist eine Monarchie','Österreich ist eine Demokratie','Österreich ist eine Diktatur','Österreich ist eine Theokratie'], a:1 },
+      { q: 'Wozu gehört das primäre Gemeinschaftsrecht?', options: ['Verordnungen','Gründungsverträge der europäischen Gemeinschaften','Entscheidungen der Behörden','Einzelfallentscheidungen'], a:1 },
+      { q: 'Welche Form des EU-Rechts wird als sekundäres Gemeinschaftsrecht bezeichnet?', options: ['Gründungsverträge','Verordnungen, Richtlinien, Entscheidungen','Bundesgesetze','Einzelfallentscheidungen'], a:1 },
+      { q: 'Was regeln Bundes- und Landesverfassungsgesetze laut der Datei?', options: ['Die Struktur der Bundes- und Landesverwaltung','Nur Verkehrsregeln','Steuersätze','Privatrechtsfragen'], a:0 },
+      { q: 'Was können Bundes- und Landesgesetze laut dem Skript tun?', options: ['Nichts regeln','Regeln für unser Leben als BürgerInnen festlegen','Nur EU-Angelegenheiten regeln','Nur internationale Beziehungen regeln'], a:1 },
+      { q: 'Wann wird eine Verordnung erlassen?', options: ['Wenn Gesetze aufgehoben werden','Wenn Gesetze präzisiert oder an Anforderungen der Praxis angepasst werden müssen','Wenn ein Bürger klagt','Bei internationalen Konflikten'], a:1 },
+      { q: 'Welches Beispiel steht für eine Einzelfallentscheidung in der Datei?', options: ['Verordnungserlass','Bauansuchen an den Bürgermeister','Gesetzesnovelle','EU-Richtlinie'], a:1 },
+      { q: 'Welche ist die erste Stufe bei der Anwendung von Recht?', options: ['Prüfung der Rechtsfolge','Feststellung des Sachverhalts, Beweisaufnahme und Beweiswürdigung','Auslegung des Tatbestands','Durchführung eines Gerichtsverfahrens'], a:1 },
+      { q: 'Welche Tätigkeit gehört zur Anwendung des Rechts nach Schritt 2?', options: ['Suche der Norm, die das Verhalten regelt und Auslegung des Tatbestands','Einspruchsfrist prüfen','Zustellung','Verkündung des Urteils'], a:0 },
+      { q: 'Welche Frage wird im dritten Schritt der Rechtsanwendung geprüft?', options: ['Ob eine Verordnung erlassen werden muss','Ob der Sachverhalt der Rechtsnorm untergeordnet werden kann','Ob eine Vertragsstrafe besteht','Ob EU-Recht anzuwenden ist'], a:1 },
+      { q: 'Was ist die Folge nach erfolgreicher Prüfung des Sachverhalts (Schritt 4)?', options: ['Feststellung der sich daraus ergebenden Rechtsfolge','Einleitung eines Gesetzgebungsverfahrens','Abruf eines Gutachtens','Vermessung des Grundstücks'], a:0 },
+      { q: 'Was beschreibt Öffentliches Recht in der Datei?', options: ['Personen stehen Behörden gegenüber, denen sie untergeordnet sind','Regelungen zwischen Privatpersonen','Nur Erbrecht','Nur Vertragsrecht'], a:0 },
+      { q: 'Welches Beispiel wird für Öffentliches Recht genannt?', options: ['Firmengründung ist die BH zuständig','Ehevertrag','Schenkungsvertrag','Mietrecht'], a:0 },
+      { q: 'Welcher Bereich ist laut Datei Teil des Privatrechts?', options: ['Bürgerliches Recht','Steuerrecht als hoheitliches Recht','Strafverfolgung','Verwaltungsverfahrensrecht'], a:0 },
+      { q: 'Wie ist das Sonderprivatrecht definiert?', options: ['Rechtsregeln für Personengruppen, z.B. Unternehmensrecht','EU-Verordnungen','Strafbestimmungen','Staatsverträge'], a:0 }
+    ]
+  },
+
+  {
+    id: 'zivilrecht',
+    title: '2 Zivilrecht',
+    questions: [
+      { q: 'Welche zwei Hauptarten von Rechtssubjekten nennt das Personenrecht?', options: ['Natürliche und juristische Personen','Staaten und Private','Vereine und Parteien','Nur natürliche Personen'], a:0 },
+      { q: 'Was ist eine natürliche Person nach der Datei?', options: ['Ein Mensch als Rechtssubjekt und Träger von Rechten und Pflichten','Ein Staat','Eine Firma ohne Rechte','Ein Grundstück'], a:0 },
+      { q: 'Was sind juristische Personen laut dem Skript?', options: ['Gesellschaften (z. B. GmbH) mit eingeschränkter Rechtsfähigkeit','Nur natürliche Personen','Nur Vereine ohne Rechtsfähigkeit','Gerichte'], a:0 },
+      { q: 'Sind juristische Personen vollständig rechtsfähig?', options: ['Ja, immer ohne Einschränkungen','Nein, mit Einschränkungen','Nur, wenn sie natürliche Personen sind','Nur bei EU-Organen'], a:1 },
+      { q: 'Welches Beispiel für juristische Personen wird genannt?', options: ['GmbH','Einzelunternehmer','Natürliche Person','Mensch'], a:0 },
+      { q: 'Gilt das Personenrecht als Teil des Zivilrechts?', options: ['Ja','Nein','Nur im Strafrecht','Nur im Verwaltungsrecht'], a:0 },
+      { q: 'Was bedeutet "Rechtssubjekt" im Zusammenhang mit natürlichen Personen?', options: ['Träger von Rechten und Pflichten','Nur mit Pflichten','Nur mit Rechten','Nur ein Begriff ohne Bedeutung'], a:0 },
+      { q: 'Welche der folgenden Aussagen entspricht dem Skript?', options: ['Juristische Personen sind immer handlungsunfähig','Juristische Personen sind Gesellschaften mit Rechtsfähigkeit','Juristische Personen sind ausschließlich staatliche Einrichtungen','Juristische Personen sind natürliche Personen'], a:1 },
+      { q: 'Welche Rolle hat das Personenrecht beim Vertragsabschluss?', options: ['Bestimmt wer rechtsfähig ist und Verträge abschließen kann','Legt Steuersätze fest','Regelt Gerichtsstände','Ist nur im Strafrecht relevant'], a:0 },
+      { q: 'Kann eine juristische Person Rechte und Pflichten haben?', options: ['Ja, aber mit Einschränkungen','Nein, nur natürliche Personen','Nur wenn sie in der EU registriert ist','Nur im Sachenrecht'], a:0 },
+      { q: 'Gehört das Personenrecht laut Datei zum Zivilrecht?', options: ['Ja, es ist eines der Kapitel des Zivilrechts','Nein, es gehört zum Strafrecht','Nur in Ausnahmefällen','Nur für Staaten'], a:0 },
+      { q: 'Welches Thema folgt im Dokument typischerweise nach dem Personenrecht?', options: ['Sachenrecht','Steuerrecht','Verwaltungsrecht','Verfassungsrecht'], a:0 },
+      { q: 'Ist ein Mensch laut Personenrecht automatisch ein Rechtssubjekt?', options: ['Ja, eine natürliche Person ist ein Rechtssubjekt','Nein, nur ab 18 Jahren','Nur nach Eintragung','Nur wenn er Eigentum besitzt'], a:0 },
+      { q: 'Welche Einheitlichkeit gilt für juristische Personen laut Datei?', options: ['Sie sind Gesellschaften und können rechtsfähig sein, aber mit Einschränkungen','Sie sind identisch mit natürlichen Personen','Sie sind immer staatlich','Sie haben keine Rechte'], a:0 },
+      { q: 'Welche der folgenden Aussagen steht im Skript?', options: ['Natürliche Personen sind Träger von Rechten und Pflichten','Natürliche Personen sind nur Pflichten','Nur juristische Personen haben Rechte','Personenrecht ist abgeschafft'], a:0 }
+    ]
+  },
+
+  {
+    id: 'sachenrecht',
+    title: '3 Sachenrecht',
+    questions: [
+      { q: 'Innerhalb welcher Frist kann der Besitzer eine Besitzstörungsklage einbringen?', options: ['14 Tage','30 Tage','6 Monate','1 Jahr'], a:1 },
+      { q: 'Was bezeichnet die Datei als Voraussetzungen für den Eigentumserwerb?', options: ['Titel und Erwerbsart','Nur Zahlung','Nur Grundbucheintragung','Nur Übergabe'], a:0 },
+      { q: 'Welcher Punkt gehört zu Titeln beim Eigentumserwerb?', options: ['Kaufvertrag, Schenkung, Gerichtsurteil','Nur mündliche Absprachen','Nur Gewohnheitsrecht','EU-Verordnung'], a:0 },
+      { q: 'Welche Erwerbsarten werden genannt?', options: ['Übergabe oder Grundbucheinschreibung','Nur elektronische Vereinbarung','Nur Besitzstörung','Nur Verordnung'], a:0 },
+      { q: 'Wann wird man Eigentümer laut der Datei?', options: ['Erst wenn Titel und Erwerbsart erfüllt sind','Sofort bei Zahlung','Erst nach 10 Jahren','Bei Besitz allein'], a:0 },
+      { q: 'Was ist das Grundbuch laut deinem Skript?', options: ['Ein öffentliches Buch, in das Grundstücke und dingliche Rechte eingetragen werden','Nur ein internes Register einer Bank','Ein privates Verzeichnis','Ein Verzeichnis der Gerichte'], a:0 },
+      { q: 'Wer führt das Grundbuch?', options: ['Das Bezirksgericht','Die Bundeskanzlei','Das Rathaus','Das Finanzamt'], a:0 },
+      { q: 'Aus welchen Teilen besteht das Grundbuch laut Datei?', options: ['Hauptbuch und Urkundensammlung','Nur ein Register','Nur eine Liste','Ein Verzeichnis der EU-Gesetze'], a:0 },
+      { q: 'Ist die Einsicht ins Grundbuch möglich?', options: ['Ja, sie ist für jeden möglich','Nein, nur für Eigentümer','Nur auf richterliche Anordnung','Nur für Behörden'], a:0 },
+      { q: 'Was darf niemand laut Datei mehr übertragen als er selbst hat?', options: ['Rechte','Geld','Wissen','Freizeit'], a:0 },
+      { q: 'Welches Beispiel zählt nicht zu Titeln?', options: ['Mündliche Zustimmung ohne Vertrag','Kaufvertrag','Schenkung','Gerichtsurteil'], a:0 }, // correct: mündliche Zustimmung -> so a:0 would be incorrect; need align: question asks which does NOT count -> options: Mündliche Zustimmung ohne Vertrag is correct answer. So index 0 correct.
+      { q: 'Welche Form der Eintragung ist für manchen Eigentumserwerb notwendig?', options: ['Grundbucheinschreibung','Nur Bescheinigung des Nachbarn','Steuerbescheid','Verordnung'], a:0 },
+      { q: 'Wie viele Hauptbestandteile nennt das Skript zum Grundbuch?', options: ['Hauptbuch und Urkundensammlung','Zwei Teile nicht genannt','Nur ein Hauptteil','Drei Teile'], a:0 },
+      { q: 'Was kann ein Besitzer tun, wenn er gestört wird?', options: ['Besitzstörungsklage innerhalb von 30 Tagen einbringen','Nichts tun','Sofort enteignen','Nur polizeiliche Meldung machen'], a:0 },
+      { q: 'Laut Datei: Was ist bei Eigentumserwerb erforderlich?', options: ['Sowohl Rechtsgrund (Titel) als auch Erwerbsart','Nur Rechtsgrund','Nur Erwerbsart','Keines von beiden'], a:0 }
+    ]
+  },
+
+  {
+    id: 'schuldrecht',
+    title: '4 Schuldrecht / Vertragsrecht',
+    questions: [
+      { q: 'Wer sind die Parteien im Schuldverhältnis?', options: ['Schuldner und Gläubiger','Kläger und Beklagter','Richter und Anwalt','Beamter und Bürger'], a:0 },
+      { q: 'Welche Pflicht hat der Schuldner?', options: ['Leistung an den Gläubiger erbringen','Gerichtsentscheidung fällen','Verordnung erlassen','Grundbucheintragung vornehmen'], a:0 },
+      { q: 'Was bezeichnet die "Geschäftsfähigkeit"?', options: ['Den Umfang, in dem eine Person rechtswirksam handeln kann','Nur das Alter einer Person','Nur die finanzielle Lage','Nur die Schulbildung'], a:0 },
+      { q: 'Welche Elemente müssen beim Vertragsabschluss frei, ernstlich und bestimmt erklärt werden?', options: ['Willenserklärungen aller Parteien','Nur eine Partei','Nur Zeugen','Nur in Anwesenheit eines Notars'], a:0 },
+      { q: 'Was kann nicht Teil eines Vertrags sein?', options: ['Das absolut Unmögliche','Mündliche Abmachungen','Schriftliche Vereinbarungen','Nebenbestimmungen'], a:0 },
+      { q: 'Was darf ein Vertrag nicht verletzen?', options: ['Gesetze oder die guten Sitten','Die Interessen des Verkäufers','Nur interne Regeln','Nur EU-Recht'], a:0 },
+      { q: 'Was bedeutet Vertragsfreiheit laut Dokument?', options: ['Grundsatz, dass Parteien grundsätzlich frei abschließen können','Pflicht zum Vertragsabschluss','Verbot von Verträgen','Nur für Staatsverträge gültig'], a:0 },
+      { q: 'Was besagt die Kontrahierungspflicht?', options: ['Wenige Gesetze sehen eine Pflicht zum Vertragsabschluss vor','Alle haben eine Pflicht Verträge abzuschließen','Es gibt keine Pflichten','Nur EU-Unternehmen sind betroffen'], a:0 },
+      { q: 'Welche Formvorschriften existieren laut Skript?', options: ['Manche Verträge dürfen nur in vorgegebener Form abgeschlossen werden','Alle Verträge sind formfrei','Formvorschriften gelten nicht mehr','Nur mündliche Form ist erlaubt'], a:0 },
+      { q: 'Wie kann eine Willenserklärung erfolgen?', options: ['Ausdrücklich oder schlüssig','Nur schriftlich','Nur durch Zeugen','Nur durch Notarielle Beglaubigung'], a:0 },
+      { q: 'Was ist "stillschweigend" bei Verträgen laut Datei?', options: ['Kein Vertrag kommt stillschweigend zustande grundsätzlich','Alle Verträge sind stillschweigend gültig','Stillschweigen bedeutet Zustimmung immer','Nur bei Dienstverträgen zulässig'], a:0 },
+      { q: 'Was kann man tun, wenn man unbestellt erhaltene Sachen bekommt?', options: ['Einfach entsorgen (keine Annahmepflicht)','Aufbewahren und Rechnung bezahlen','Sofort zurücksenden','Verkaufen'], a:0 },
+      { q: 'Welche drei Elemente müssen zur ordentlichen Erfüllung eines Vertrags gegeben sein?', options: ['Am Erfüllungsort, zur Erfüllungszeit, auf vereinbarte Art und Weise','Nur Zahlung, Lieferung, Empfang','Nur Erfüllungsort','Nur Frist'] , a:0 },
+      { q: 'Was ist der Erfüllungsort?', options: ['Ort, an dem die Leistung zu erbringen ist','Büro des Verkäufers','Immer das Wohnsitzgericht','Nur der Lieferant entscheidet'], a:0 },
+      { q: 'Was versteht man unter "Erfüllungszeit"?', options: ['Der Zeitpunkt, an dem die Leistung spätestens zu erbringen ist','Der Zeitpunkt der Vertragsunterzeichnung','Ein optionaler Moment','Nur für Dienstverträge relevant'], a:0 }
+    ]
+  },
+
+  {
+    id: 'konsumentenschutz',
+    title: '5 Konsumentenschutz',
+    questions: [
+      { q: 'Sind Kostenvoranschläge grundsätzlich kostenlos laut Datei?', options: ['Ja, wenn der Unternehmer nicht auf Zahlungspflicht hingewiesen hat','Nein, sie sind immer kostenpflichtig','Nur bei Kleinunternehmen kostenlos','Nur bei öffentlichen Aufträgen gratis'], a:0 },
+      { q: 'Sind Kostenvoranschläge verbindlich?', options: ['Ja, z.B. wenn weniger Material benötigt wird muss Ersparnis weitergegeben werden','Nein, nie verbindlich','Nur wenn schriftlich','Nur bei EU-Projekten'], a:0 },
+      { q: 'Wie viel darf die Kostensteigerung ohne Zustimmung des Auftraggebers ungefähr betragen?', options: ['Nicht erheblich, also nicht mehr als 10-15%','Bis zu 50%','Beliebig','Maximal 100%'], a:0 },
+      { q: 'Welche Vertragsbestandteile sind unzulässig laut Datei?', options: ['Grob benachteiligende Bestimmungen','Nur Preisangaben','Nur Lieferzeiten','Nur Leistungsbeschreibungen'], a:0 },
+      { q: 'Was ist ein Beispiel für unklare Bestimmungen?', options: ['Bestimmungen gegen das Konsumentenschutzgesetz','Konkrete Preislisten','Lieferfristen','Garantiebestimmungen'], a:0 },
+      { q: 'Was kann eine Verbandklage bewirken laut Skript?', options: ['Gericht kann Unternehmer anweisen, rechtswidrige Bestimmungen nicht mehr zu verwenden','Sie ersetzt Kundenschutz nie','Sie erhöht Preise','Sie ist nur symbolisch'], a:0 },
+      { q: 'Auf welche Vertragsbestimmungen muss besonders hingewiesen werden?', options: ['Auf ungewöhnliche Vertragsbestimmungen','Auf Standardleistungsverzeichnisse','Nur auf Preise','Nur auf Zahlungsarten'], a:0 },
+      { q: 'Kann man jederzeit einen Vertrag auflösen (Rücktritt) laut Datei?', options: ['Nein, man kann nicht einfach schließen und anschließend auflösen','Ja, immer','Nur bei Gewährleistung','Nur bei Insolvenz'], a:0 },
+      { q: 'Gibt es bei Außergeschäftsraumverträgen ein Rücktrittsrecht?', options: ['Ja, grundsätzlich bis zu 14 Tage','Nein, niemals','Nur bei Waren über 500€','Nur bei Dienstleistungen'], a:0 },
+      { q: 'Was bedeutet "Außergeschäftsraumvertrag"?', options: ['Verträge, die außerhalb eines Geschäftsraums geschlossen werden','Online-Verträge','Nur Verträge mit Staaten','Nur Bankverträge'], a:0 },
+      { q: 'Welche Pflicht hat ein Unternehmer bei Kostenvoranschlägen bezüglich Materialersparnis?', options: ['Die Ersparnis muss an den Kunden weitergegeben werden','Er kann die Ersparnis behalten','Er darf den Preis frei erhöhen','Keine Regel angegeben'], a:0 },
+      { q: 'Worauf zielen unzulässige AGB-Bestandteile ab?', options: ['Kunden abzuziehen oder grob zu benachteiligen','Mehr Service zu bieten','Preise zu senken','Garantien zu verlängern'], a:0 },
+      { q: 'Was ist ein praktischer Effekt einer erfolgreichen Verbandklage?', options: ['Unternehmer darf die rechtswidrigen Bestimmungen ab sofort nicht mehr verwenden','Unternehmer bekommt eine Warnung ohne Wirkung','Es ändert Preise','Es betrifft nur einzelne Kunden'], a:0 },
+      { q: 'Wie bindend sind Kostenvoranschläge laut Skript?', options: ['Sie sind grundsätzlich verbindlich','Sie sind nie verbindlich','Nur dann verbindlich, wenn notariell beglaubigt','Nur bei öffentlichen Bauvorhaben'], a:0 },
+      { q: 'Welches Recht besteht grundsätzlich bei Verträgen außerhalb von Geschäftsräumen?', options: ['Ein Rücktrittsrecht bis 14 Tage','Kein Rücktrittsrecht','Rücktrittsrecht nur bei fahrlässigem Verhalten','Rücktrittsrecht nur bei Mängeln'], a:0 }
+    ]
+  },
+
+  {
+    id: 'zivilprozess',
+    title: '6 Zivilprozessrecht',
+    questions: [
+      { q: 'An welchem Ort kann eine Klage laut Datei eingebracht werden?', options: ['Allgemeiner Gerichtsstand des Beklagten z.B. Wohnort des Beklagten','Nur beim Bezirksgericht des Klägers','Nur beim Obersten Gerichtshof','Nur beim Europäischen Gerichtshof'], a:0 },
+      { q: 'Was ist ein Zwanggerichtsstand beispielhaft?', options: ['Letzter gemeinsamer Aufenthaltsort','Wohnort des Klägers','Vorläufiger Gerichtsstand','Gericht in der EU-Hauptstadt'], a:0 },
+      { q: 'Was kann ein Wahlgerichtsstand sein?', options: ['Das vom Vertrag oder Parteien gewählte Gericht','Nur das Bezirksgericht','Das Finanzgericht','Das Strafgericht'], a:0 },
+      { q: 'Wann gilt Anwaltspflicht laut Skript?', options: ['Bei Landesgerichten, Oberlandesgerichten, dem OGH und Bezirksgerichten bei Prozessen über 5.000€ Streitwert','Nie','Nur bei Verwaltungsverfahren','Bei allen Verfahren unabhängig vom Streitwert'], a:0 },
+      { q: 'Für welche Verfahren gibt es ein Mahnverfahren bis 75.000€?', options: ['Geldforderungen bis 75.000€','Nur Strafverfahren','Nur Familienrecht','Nur bei internationalen Streitigkeiten'], a:0 },
+      { q: 'Wer trägt meist die Kosten des Prozesses laut Datei?', options: ['Der Prozessverlierer muss alle Kosten übernehmen','Immer der Kläger','Immer der Staat','Beide Parteien je hälftig'], a:0 },
+      { q: 'Welche Versicherung unterstützt häufig bei Prozesskosten?', options: ['Rechtsschutzversicherung','Lebensversicherung','Hausratversicherung','KFZ-Versicherung'], a:0 },
+      { q: 'Was sind Sonderverfahren laut Skript?', options: ['Außenstreitverfahren und Schiedsgerichte','Nur normale Zivilverfahren','Nur Mahnverfahren','Nur Verwaltungsverfahren'], a:0 },
+      { q: 'Wofür ist das Außenstreitverfahren gedacht?', options: ['Für Angelegenheiten, die für ein Zivilverfahren nicht geeignet wären','Für Standardstreitigkeiten','Für Strafsachen','Für Mathematische Probleme'], a:0 },
+      { q: 'Was sind Schiedsgerichte laut der Datei?', options: ['Keine staatlichen Gerichte','Staatliche Gerichte','Nur Verwaltungsstellen','Nur gemeinnützige Organisationen'], a:0 },
+      { q: 'Wer ist für Exekution zuständig?', options: ['Bezirksgerichte','Landesregierung','Bundeskanzler','EU-Gericht'], a:0 },
+      { q: 'Was ist oft erforderlich, bevor Exekutionen stattfinden?', options: ['Ein Exekutionsbewilligungsbeschluss','Ein einfacher Brief','Nur Ankündigung','Keine Genehmigung'], a:0 },
+      { q: 'Welche Arten von Exekutionen werden genannt?', options: ['Gehalt- bzw. Lohnexekutionen oder Fahrnisexekutionen','Nur Zwangsräumungen','Nur Kontosperren','Nur Beschlagnahmungen'] , a:0 },
+      { q: 'Was ist eine Folge von Exekutionen laut Skript?', options: ['Pfändungen werden vorgenommen','Gesetze werden aufgehoben','Verordnungen entstehen','Gerichte schließen'], a:0 },
+      { q: 'In welchem Fall gibt es Anwaltspflicht bei Bezirksgerichten?', options: ['Bei Prozessen über 5.000€ Streitwert','Bei jedem Fall','Nur bei Familienrecht','Nur bei Strafsachen'], a:0 }
+    ]
+  },
+
+  {
+    id: 'insolvenz',
+    title: '7 Insolvenzrecht',
+    questions: [
+      { q: 'Wie definiert das Skript Insolvenz?', options: ['Begriff der Zahlungsunfähigkeit','Nur Überschuldung','Nur Zahlungsstockung','Nur Konkurs'] , a:0 },
+      { q: 'Was ist Konkurs laut Datei?', options: ['Ein Verfahren, das eingeleitet wird','Ein Zahlungsmittel','Ein Vertrag','Eine Verordnung'], a:0 },
+      { q: 'Was beschreibt "Bonität"?', options: ['Fähigkeit eines Schuldners, Zahlungsverpflichtungen zu erfüllen','Rechtsfähigkeit einer Gesellschaft','Nur Steuerstatus','Gerichtliche Zuständigkeit'], a:0 },
+      { q: 'Wozu dienen Schuldnerberatungsstellen laut Skript?', options: ['Helfen um aus Schulden herauszukommen','Nur für Insolvenzanwälte','Nur für Banken','Nur für Gerichte'], a:0 },
+      { q: 'Welche Eigenschaft sollten Schuldnerberatungsstellen haben?', options: ['Auszeichnung als staatlich anerkannte Schuldenberatung','Nur privat sein','Nur online existieren','Nur für Unternehmen'], a:0 },
+      { q: 'Was kann man versuchen, bevor man ein gerichtliches Verfahren startet?', options: ['Außergerichtlichen Ausgleich mit Gläubigern','Sofort Konkurs anmelden','Nichts tun','Nur Ankündigungen machen'], a:0 },
+      { q: 'Wie schätzt das Skript die Erfolgsaussicht eines außergerichtlichen Ausgleichs ein?', options: ['Meistens scheitert er','Immer erfolgreich','Immer verboten','Nur für Banken möglich'], a:0 },
+      { q: 'Welches Verfahren wird genannt, um Schulden zu regulieren?', options: ['Schuldenregulierungsverfahren','Nur Mahnverfahren','Nur Exekution','Nur Zwangsverwaltung'], a:0 },
+      { q: 'Gilt Unternehmensinsolvenz im Kapitel?', options: ['Ja, Unternehmensinsolvenz wird genannt','Nein, nur Privatinsolvenz','Nur bankenspezifisch','Nur EU-relevant'], a:0 },
+      { q: 'Welche Maßnahme kann helfen, Schulden zu reduzieren laut Datei?', options: ['Außergerichtlicher Ausgleich','Erhöhung der Ausgaben','Verschleierung','Kein Kontakt zu Gläubigern'], a:0 },
+      { q: 'Wird im Skript eine staatliche Anerkennung der Schuldnerberatung empfohlen?', options: ['Ja, nur staatlich anerkannte Beratungen sind wichtig','Nein, jede Beratung ist gleich','Nur ausländische Beratungen sind zulässig','Nur Online-Beratungen sind anerkannt'], a:0 },
+      { q: 'Welches Ziel haben Schuldnerberatungsstellen?', options: ['Aus den Schulden heraushelfen','Neue Schulden erzeugen','Gerichte umgehen','Insolvenz verhindern um jeden Preis'], a:0 },
+      { q: 'Ist Konkurs im Skript ein Begriff oder ein Verfahren?', options: ['Es ist ein Verfahren, das eingeleitet wird','Nur ein juristischer Begriff ohne Verfahren','Ein internationales Abkommen','Ein privater Vertrag'], a:0 },
+      { q: 'Welche Eigenschaft wird mit Bonität verknüpft?', options: ['Zahlungsfähigkeit des Schuldners','Gerichtszuständigkeit','Vertragsfähigkeit','Nur Eigentumsfragen'], a:0 },
+      { q: 'Was ist oft die Folge, wenn außergerichtliche Lösungen scheitern?', options: ['Anstoß zu gerichtlichen Verfahren wie Konkurs','Automatische Löschung der Schulden','Sofortige Entschuldung','Nichts passiert'], a:0 }
+    ]
+  }
+];
+
+/* --- Applikationslogik --- */
+
+let state = {
+  user: null,
+  scores: {}, // scores[user] = number
+  players: {}, // {username:score}
+  currentCategory: null,
+  qIndex: 0,
+  order: []
+};
+
+function saveToLocal(){
+  localStorage.setItem('rk_state', JSON.stringify({scores: state.scores, players: state.players}));
+}
+function loadFromLocal(){
+  const s = localStorage.getItem('rk_state');
+  if(s){ try{ const parsed = JSON.parse(s); state.scores = parsed.scores||{}; state.players = parsed.players||{}; }catch(e){}}
+}
+loadFromLocal();
+
+/* UI refs */
+const topicsGrid = document.getElementById('topicsGrid');
+const displayUser = document.getElementById('displayUser');
+const displayScore = document.getElementById('displayScore');
+const playersList = document.getElementById('playersList');
+const questionText = document.getElementById('questionText');
+const optionsList = document.getElementById('optionsList');
+const homeView = document.getElementById('homeView');
+const quizView = document.getElementById('quizView');
+const currentTopicEl = document.getElementById('currentTopic');
+const progressEl = document.getElementById('progress');
+const usernameInput = document.getElementById('usernameInput');
+const saveUserBtn = document.getElementById('saveUserBtn');
+const backBtn = document.getElementById('backBtn');
+const skipBtn = document.getElementById('skipBtn');
+const resetScoreBtn = document.getElementById('resetScoreBtn');
+const changeUserBtn = document.getElementById('changeUserBtn');
+const userCard = document.getElementById('userCard');
+
+/* Build topic buttons */
+function renderTopics(){
+  topicsGrid.innerHTML = '';
+  categories.forEach(cat=>{
+    const btn = document.createElement('button');
+    btn.className = 'topic-btn';
+    btn.textContent = cat.title;
+    btn.onclick = ()=> startCategory(cat.id);
+    topicsGrid.appendChild(btn);
+  });
+}
+
+/* Start a category */
+function startCategory(catId){
+  if(!state.user){ alert('Bitte zuerst Benutzernamen eingeben.'); return; }
+  const cat = categories.find(c=>c.id===catId);
+  state.currentCategory = cat;
+  // random order of questions
+  state.order = Array.from({length:cat.questions.length},(_,i)=>i).sort(()=>Math.random()-0.5);
+  state.qIndex = 0;
+  showQuiz();
+  renderQuestion();
+}
+
+/* Render question */
+function renderQuestion(){
+  const cat = state.currentCategory;
+  if(!cat) return;
+  currentTopicEl.textContent = cat.title;
+  const qObj = cat.questions[state.order[state.qIndex]];
+  progressEl.textContent = `Frage ${state.qIndex+1} / ${cat.questions.length}`;
+  questionText.textContent = qObj.q;
+  optionsList.innerHTML = '';
+  qObj.options.forEach((opt,idx)=>{
+    const d = document.createElement('div');
+    d.className = 'opt';
+    d.textContent = opt;
+    d.onclick = ()=> handleAnswer(idx, d);
+    optionsList.appendChild(d);
+  });
+}
+
+/* Handle answer selection */
+function handleAnswer(idx, el){
+  const cat = state.currentCategory;
+  const qObj = cat.questions[state.order[state.qIndex]];
+  // disable options
+  Array.from(optionsList.children).forEach(c=>c.onclick=null);
+  if(idx === qObj.a){
+    el.classList.add('correct');
+    // add point
+    state.scores[state.user] = (state.scores[state.user]||0) + 1;
+    state.players[state.user] = state.scores[state.user];
+    saveToLocal();
+    updateScoreDisplay();
+  } else {
+    el.classList.add('wrong');
+    // show correct
+    const correctEl = optionsList.children[qObj.a];
+    if(correctEl) correctEl.classList.add('correct');
+  }
+  // auto-enable skip to next
+  setTimeout(()=> {
+    // next question if any
+    if(state.qIndex < cat.questions.length - 1){
+      state.qIndex++;
+      renderQuestion();
+    } else {
+      // end of category: show message and go to home
+      alert('Ende des Themas — du kannst ein anderes Thema wählen oder wiederholen.');
+      showHome();
+    }
+  }, 700);
+}
+
+/* UI toggles */
+function showHome(){
+  homeView.classList.remove('hidden');
+  quizView.classList.add('hidden');
+  state.currentCategory = null;
+}
+function showQuiz(){
+  homeView.classList.add('hidden');
+  quizView.classList.remove('hidden');
+}
+
+/* Score display */
+function updateScoreDisplay(){
+  displayUser.textContent = state.user || '—';
+  const sc = state.scores[state.user]||0;
+  displayScore.textContent = sc;
+  // players list
+  playersList.innerHTML = '';
+  const keys = Object.keys(state.players);
+  if(keys.length === 0) playersList.textContent = 'Keine Spieler';
+  else {
+    keys.forEach(u=>{
+      const row = document.createElement('div');
+      row.className = 'score-row';
+      row.innerHTML = `<div>${u}</div><div>${state.players[u]||0}</div>`;
+      playersList.appendChild(row);
+    });
+  }
+}
+
+/* Event handlers */
+saveUserBtn.onclick = ()=>{
+  const name = usernameInput.value && usernameInput.value.trim();
+  if(!name){ alert('Bitte einen Benutzernamen eingeben.'); return; }
+  state.user = name;
+  if(!(name in state.scores)) state.scores[name] = 0;
+  state.players[name] = state.scores[name];
+  saveToLocal();
+  displayUser.textContent = name;
+  updateScoreDisplay();
+  // hide username prompt minimally
+  userCard.classList.add('hidden');
+};
+backBtn.onclick = ()=> { showHome(); };
+skipBtn.onclick = ()=> {
+  // skip to next question without awarding points
+  const cat = state.currentCategory;
+  if(!cat) return;
+  if(state.qIndex < cat.questions.length - 1){
+    state.qIndex++;
+    renderQuestion();
+  } else {
+    alert('Keine weiteren Fragen in diesem Thema.');
+    showHome();
+  }
+};
+
+resetScoreBtn.onclick = ()=>{
+  if(!state.user){ alert('Kein Benutzer angemeldet.'); return; }
+  if(confirm('Deinen Score zurücksetzen?')) {
+    state.scores[state.user] = 0;
+    state.players[state.user] = 0;
+    saveToLocal();
+    updateScoreDisplay();
+  }
+};
+changeUserBtn.onclick = ()=>{
+  // show username card again
+  userCard.classList.remove('hidden');
+};
+
+/* Init */
+renderTopics();
+updateScoreDisplay();
+
+/* Expose some helpers for debugging in console */
+window.rk = { state, categories };
+
+</script>
+</body>
+</html>
